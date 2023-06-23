@@ -295,8 +295,7 @@ class MakeCutouts(nn.Module):
             cutouts.append(resample(cutout, (self.cut_size, self.cut_size)))
             del cutout
 
-        cutouts = torch.cat(cutouts, dim=0)
-        return cutouts
+        return torch.cat(cutouts, dim=0)
 
 cutout_debug = False
 padargs = {}
@@ -370,9 +369,7 @@ class MakeCutoutsDango(nn.Module):
                     cutouts.append(gray(TF.hflip(cutout)))
             else:
                 cutout = resize(pad_input, out_shape=output_shape)
-                for _ in range(self.Overview):
-                    cutouts.append(cutout)
-
+                cutouts.extend(cutout for _ in range(self.Overview))
             if cutout_debug:
                 TF.to_pil_image(cutouts[0].clamp(0, 1).squeeze(0)).save("/content/cutout_overview0.jpg",quality=99)
 

@@ -68,8 +68,22 @@ vq_parser.add_argument("-ii",   "--init_image", type=str, help="Initial image", 
 vq_parser.add_argument("-in",   "--init_noise", type=str, help="Initial noise image (pixels or gradient)", default=None, dest='init_noise')
 vq_parser.add_argument("-iw",   "--init_weight", type=float, help="Initial weight", default=0., dest='init_weight')
 vq_parser.add_argument("-m",    "--clip_model", type=str, help="CLIP model (e.g. ViT-B/32, ViT-B/16)", default='ViT-B/32', dest='clip_model')
-vq_parser.add_argument("-conf", "--vqgan_config", type=str, help="VQGAN config", default=f'checkpoints/vqgan_imagenet_f16_16384.yaml', dest='vqgan_config')
-vq_parser.add_argument("-ckpt", "--vqgan_checkpoint", type=str, help="VQGAN checkpoint", default=f'checkpoints/vqgan_imagenet_f16_16384.ckpt', dest='vqgan_checkpoint')
+vq_parser.add_argument(
+    "-conf",
+    "--vqgan_config",
+    type=str,
+    help="VQGAN config",
+    default='checkpoints/vqgan_imagenet_f16_16384.yaml',
+    dest='vqgan_config',
+)
+vq_parser.add_argument(
+    "-ckpt",
+    "--vqgan_checkpoint",
+    type=str,
+    help="VQGAN checkpoint",
+    default='checkpoints/vqgan_imagenet_f16_16384.ckpt',
+    dest='vqgan_checkpoint',
+)
 vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
 vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
 vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.1, dest='step_size')
@@ -113,11 +127,7 @@ if args.prompts:
     # For stories, there will be many phrases
     story_phrases = [phrase.strip() for phrase in args.prompts.split("^")]
 
-    # Make a list of all phrases
-    all_phrases = []
-    for phrase in story_phrases:
-        all_phrases.append(phrase.split("|"))
-
+    all_phrases = [phrase.split("|") for phrase in story_phrases]
     # First phrase
     args.prompts = all_phrases[0]
 
@@ -136,14 +146,13 @@ if '/' in args.output:
     if not os.path.exists(odir):
         os.mkdir(odir)
 
-# Make video steps directory
-if args.make_video or args.make_zoom_video:
-    if not os.path.exists('steps'):
+if not os.path.exists('steps'):
+    if args.make_video or args.make_zoom_video:
         os.mkdir('steps')
 
 # Fallback to CPU if CUDA is not found and make sure GPU video rendering is also disabled
 # NB. May not work for AMD cards?
-if not args.cuda_device == 'cpu' and not torch.cuda.is_available():
+if args.cuda_device != 'cpu' and not torch.cuda.is_available():
     args.cuda_device = 'cpu'
     args.video_fps = 0
     print("Warning: No GPU found! Using the CPU instead. The iterations will be slow.")
@@ -152,12 +161,12 @@ if not args.cuda_device == 'cpu' and not torch.cuda.is_available():
 # If a video_style_dir has been, then create a list of all the images
 if args.video_style_dir:
     print("Locating video frames...")
-    video_frame_list = []
-    for entry in os.scandir(args.video_style_dir):
-        if (entry.path.endswith(".jpg")
-                or entry.path.endswith(".png")) and entry.is_file():
-            video_frame_list.append(entry.path)
-
+    video_frame_list = [
+        entry.path
+        for entry in os.scandir(args.video_style_dir)
+        if (entry.path.endswith(".jpg") or entry.path.endswith(".png"))
+        and entry.is_file()
+    ]
     # Reset a few options - same filename, different directory
     if not os.path.exists('steps'):
         os.mkdir('steps')
@@ -201,8 +210,9 @@ def zoom_at(img, x, y, zoom):
 
 # NR: Testing with different intital images
 def random_noise_image(w,h):
-    random_image = Image.fromarray(np.random.randint(0,255,(w,h,3),dtype=np.dtype('uint8')))
-    return random_image
+    return Image.fromarray(
+        np.random.randint(0, 255, (w, h, 3), dtype=np.dtype('uint8'))
+    )
 
 
 # create initial gradient image
@@ -224,8 +234,7 @@ def gradient_3d(width, height, start_list, stop_list, is_horizontal_list):
 
 def random_gradient_image(w,h):
     array = gradient_3d(w, h, (0, 0, np.random.randint(0,255)), (np.random.randint(1,255), np.random.randint(2,255), np.random.randint(3,128)), (True, False, False))
-    random_image = Image.fromarray(np.uint8(array))
-    return random_image
+    return Image.fromarray(np.uint8(array))
 
 
 # Used in older MakeCutouts
@@ -418,29 +427,29 @@ class MakeCutoutsNRUpdate(nn.Module):
         # Pick your own augments & their order
         augment_list = []
         for item in args.augments[0]:
-            if item == 'Ji':
-                augment_list.append(K.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1, p=0.7))
-            elif item == 'Sh':
-                augment_list.append(K.RandomSharpness(sharpness=0.3, p=0.5))
-            elif item == 'Gn':
-                augment_list.append(K.RandomGaussianNoise(mean=0.0, std=1., p=0.5))
-            elif item == 'Pe':
-                augment_list.append(K.RandomPerspective(distortion_scale=0.5, p=0.7))
-            elif item == 'Ro':
-                augment_list.append(K.RandomRotation(degrees=15, p=0.7))
-            elif item == 'Af':
+            if item == 'Af':
                 augment_list.append(K.RandomAffine(degrees=30, translate=0.1, shear=5, p=0.7, padding_mode='zeros', keepdim=True)) # border, reflection, zeros
-            elif item == 'Et':
-                augment_list.append(K.RandomElasticTransform(p=0.7))
-            elif item == 'Ts':
-                augment_list.append(K.RandomThinPlateSpline(scale=0.8, same_on_batch=True, p=0.7))
             elif item == 'Cr':
                 augment_list.append(K.RandomCrop(size=(self.cut_size,self.cut_size), pad_if_needed=True, padding_mode='reflect', p=0.5))
             elif item == 'Er':
                 augment_list.append(K.RandomErasing(scale=(.1, .4), ratio=(.3, 1/.3), same_on_batch=True, p=0.7))
+            elif item == 'Et':
+                augment_list.append(K.RandomElasticTransform(p=0.7))
+            elif item == 'Gn':
+                augment_list.append(K.RandomGaussianNoise(mean=0.0, std=1., p=0.5))
+            elif item == 'Ji':
+                augment_list.append(K.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1, p=0.7))
+            elif item == 'Pe':
+                augment_list.append(K.RandomPerspective(distortion_scale=0.5, p=0.7))
             elif item == 'Re':
                 augment_list.append(K.RandomResizedCrop(size=(self.cut_size,self.cut_size), scale=(0.1,1),  ratio=(0.75,1.333), cropping_mode='resample', p=0.5))
 
+            elif item == 'Ro':
+                augment_list.append(K.RandomRotation(degrees=15, p=0.7))
+            elif item == 'Sh':
+                augment_list.append(K.RandomSharpness(sharpness=0.3, p=0.5))
+            elif item == 'Ts':
+                augment_list.append(K.RandomThinPlateSpline(scale=0.8, same_on_batch=True, p=0.7))
         self.augs = nn.Sequential(*augment_list)
 
 
@@ -553,7 +562,7 @@ def resize_image(image, out_size):
 # Do it
 device = torch.device(args.cuda_device)
 model = load_vqgan_model(args.vqgan_config, args.vqgan_checkpoint).to(device)
-jit = True if "1.7.1" in torch.__version__ else False
+jit = "1.7.1" in torch.__version__
 perceptor = clip.load(args.clip_model, jit=jit)[0].eval().requires_grad_(False).to(device)
 
 # clock=deepcopy(perceptor.visual.positional_embedding.data)
@@ -660,25 +669,24 @@ for seed, weight in zip(args.noise_prompt_seeds, args.noise_prompt_weights):
 # Set the optimiser
 def get_opt(opt_name, opt_lr):
     if opt_name == "Adam":
-        opt = optim.Adam([z], lr=opt_lr)	# LR=0.1 (Default)
+        return optim.Adam([z], lr=opt_lr)
     elif opt_name == "AdamW":
-        opt = optim.AdamW([z], lr=opt_lr)
+        return optim.AdamW([z], lr=opt_lr)
     elif opt_name == "Adagrad":
-        opt = optim.Adagrad([z], lr=opt_lr)
+        return optim.Adagrad([z], lr=opt_lr)
     elif opt_name == "Adamax":
-        opt = optim.Adamax([z], lr=opt_lr)
+        return optim.Adamax([z], lr=opt_lr)
     elif opt_name == "DiffGrad":
-        opt = DiffGrad([z], lr=opt_lr, eps=1e-9, weight_decay=1e-9) # NR: Playing for reasons
+        return DiffGrad([z], lr=opt_lr, eps=1e-9, weight_decay=1e-9)
     elif opt_name == "AdamP":
-        opt = AdamP([z], lr=opt_lr)
+        return AdamP([z], lr=opt_lr)
     elif opt_name == "RAdam":
-        opt = RAdam([z], lr=opt_lr)
+        return RAdam([z], lr=opt_lr)
     elif opt_name == "RMSprop":
-        opt = optim.RMSprop([z], lr=opt_lr)
+        return optim.RMSprop([z], lr=opt_lr)
     else:
         print("Unknown optimiser. Are choices broken?")
-        opt = optim.Adam([z], lr=opt_lr)
-    return opt
+        return optim.Adam([z], lr=opt_lr)
 
 opt = get_opt(args.optimiser, args.step_size)
 
@@ -699,10 +707,7 @@ if args.noise_prompt_weights:
     print('Noise prompt weights:', args.noise_prompt_weights)
 
 
-if args.seed is None:
-    seed = torch.seed()
-else:
-    seed = args.seed
+seed = torch.seed() if args.seed is None else args.seed
 torch.manual_seed(seed)
 print('Using seed:', seed)
 
@@ -738,13 +743,11 @@ def ascend_txt():
         # result.append(F.mse_loss(z, z_orig) * args.init_weight / 2)
         result.append(F.mse_loss(z, torch.zeros_like(z_orig)) * ((1/torch.tensor(i*2 + 1))*args.init_weight) / 2)
 
-    for prompt in pMs:
-        result.append(prompt(iii))
-
+    result.extend(prompt(iii) for prompt in pMs)
     if args.make_video:
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
         img = np.transpose(img, (1, 2, 0))
-        imageio.imwrite('./steps/' + str(i) + '.png', np.array(img))
+        imageio.imwrite(f'./steps/{str(i)}.png', np.array(img))
 
     return result # return loss
 

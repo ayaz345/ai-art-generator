@@ -43,11 +43,11 @@ def upscale(in_dir, scale, do_face_enhance, do_single):
     # make output dir if it doesn't exist
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     cwd = os.getcwd().replace('utils', '')
-    esrgan_dir = cwd + 'Real-ESRGAN'
+    esrgan_dir = f'{cwd}Real-ESRGAN'
 
     # invoke Real-ESRGAN
     if not do_single:
-        print ("Invoking Real-ESRGAN: " + command)
+        print(f"Invoking Real-ESRGAN: {command}")
         subprocess.call(command, cwd=(esrgan_dir), stderr=subprocess.DEVNULL)
     else:
         # we're going to call ESRGAN once per image
@@ -55,33 +55,29 @@ def upscale(in_dir, scale, do_face_enhance, do_single):
         new_files = os.listdir(in_dir)
         for f in new_files:
             file_ext = f[-4:]
-            if (file_ext == ".jpg") or (file_ext == ".png"):
+            if file_ext in [".jpg", ".png"]:
                 # this is an image, let's try to upscale it
                 command = orig_command.replace(" -i \"" + in_dir, " -i \"" + in_dir + "\\" + f)
-                print ("Invoking Real-ESRGAN (per image): " + command)
+                print(f"Invoking Real-ESRGAN (per image): {command}")
                 subprocess.call(command, cwd=(esrgan_dir), stderr=subprocess.DEVNULL)
 
 
     # create text string to append to metadata
     upscale_text = " (upscaled "
-    upscale_text += str(scale) + "x via "
-    if do_face_enhance:
-        upscale_text += "GFPGAN)"
-    else:
-        upscale_text += "ESRGAN)"
-
+    upscale_text += f"{str(scale)}x via "
+    upscale_text += "GFPGAN)" if do_face_enhance else "ESRGAN)"
     # copy metadata from original files to upscaled files
     print('\nCopying metadata from original files to upscaled files...')
     new_files = os.listdir(out_dir)
     for f in new_files:
         f = f.lower()
         file_ext = f[-4:]
-        if (file_ext == ".jpg") or (file_ext == ".png"):
+        if file_ext in [".jpg", ".png"]:
             basef = f.replace(file_ext, "")
             if basef[-2:] == "_u":
                 # this is an upscaled image,
                 # check for an original w/ metadata
-                original_file = in_dir + "/" + basef[:-2] + file_ext
+                original_file = f"{in_dir}/{basef[:-2]}{file_ext}"
                 if exists(original_file):
                     # found the corresponding original,
                     # copy the metadata
@@ -97,19 +93,24 @@ def upscale(in_dir, scale, do_face_enhance, do_single):
                             exif[0x9c9d] = upscale_text.encode('utf16')
 
                     # save to the new image
-                    new_Image = Image.open(out_dir + "/" + f)
+                    new_Image = Image.open(f"{out_dir}/{f}")
                     im = new_Image.convert('RGB')
-                    im.save(out_dir + "/" + basef[:-2] + file_ext, exif=exif, quality=88)
+                    im.save(f"{out_dir}/{basef[:-2]}{file_ext}", exif=exif, quality=88)
 
                     # remove the upscaled file with the '_u' extension
-                    if exists(out_dir + "/" + basef + file_ext):
-                        os.remove(out_dir + "/" + basef + file_ext)
+                    if exists(f"{out_dir}/{basef}{file_ext}"):
+                        os.remove(f"{out_dir}/{basef}{file_ext}")
 
     print('All done!\n')
 
 def main():
     print('\nUpscaling (' + str(UPSCALE_AMOUNT) + 'x) all .jpg images in: ' + os.getcwd() + '\\' + UPSCALE_IN_DIR)
-    print('Upscaled images will be written to: ' + os.getcwd() + '\\' + UPSCALE_OUT_DIR + '\n')
+    print(
+        f'Upscaled images will be written to: {os.getcwd()}'
+        + '\\'
+        + UPSCALE_OUT_DIR
+        + '\n'
+    )
     print
     upscale(UPSCALE_AMOUNT, UPSCALE_IN_DIR, UPSCALE_OUT_DIR, UPSCALE_FACE_ENH)
 
@@ -147,16 +148,15 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
 
-    if opt.imgdir != "":
-        if not os.path.exists(opt.imgdir):
-            print("\nThe specified path '" + opt.imgdir + "' doesn't exist!")
-            print("Please specify a valid directory containing images.")
-            exit()
-        else:
-            upscale(opt.imgdir, opt.amount, opt.faces, opt.single)
-
-    else:
+    if opt.imgdir == "":
         print("\nUsage: python upscale.py --imgdir [directory containing images]")
         print("Example: python upscale.py --imgdir \"c:\images\"")
         print("Options/help: python upscale.py --help")
         exit()
+
+    elif not os.path.exists(opt.imgdir):
+        print("\nThe specified path '" + opt.imgdir + "' doesn't exist!")
+        print("Please specify a valid directory containing images.")
+        exit()
+    else:
+        upscale(opt.imgdir, opt.amount, opt.faces, opt.single)

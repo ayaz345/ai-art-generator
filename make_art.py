@@ -26,7 +26,12 @@ if sys.platform == "win32" or os.name == 'nt':
     import keyboard
     os.environ['PYTHONPATH'] = os.pathsep + (cwd + "\latent-diffusion") + os.pathsep + (cwd + "\\taming-transformers") + os.pathsep + (cwd + "\CLIP")
 else:
-    os.environ['PYTHONPATH'] = os.pathsep + (cwd + "/latent-diffusion") + os.pathsep + (cwd + "/taming-transformers") + os.pathsep + (cwd + "/CLIP")
+    os.environ['PYTHONPATH'] = (
+        f"{os.pathsep}{cwd}/latent-diffusion{os.pathsep}"
+        + f"{cwd}/taming-transformers"
+        + os.pathsep
+        + f"{cwd}/CLIP"
+    )
 
 # these can be overriden with prompt file directives, no need to change them here
 CUDA_DEVICE = 0         # cuda device to use, default is 0

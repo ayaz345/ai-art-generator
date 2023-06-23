@@ -25,7 +25,12 @@ gpu_name = get_device_name()
 if sys.platform == "win32" or os.name == 'nt':
     os.environ['PYTHONPATH'] = os.pathsep + (cwd + "\latent-diffusion") + os.pathsep + (cwd + "\\taming-transformers") + os.pathsep + (cwd + "\CLIP")
 else:
-    os.environ['PYTHONPATH'] = os.pathsep + (cwd + "/latent-diffusion") + os.pathsep + (cwd + "/taming-transformers") + os.pathsep + (cwd + "/CLIP")
+    os.environ['PYTHONPATH'] = (
+        f"{os.pathsep}{cwd}/latent-diffusion{os.pathsep}"
+        + f"{cwd}/taming-transformers"
+        + os.pathsep
+        + f"{cwd}/CLIP"
+    )
 
 SD_LOW_MEMORY = "no"    # use low-memory repo?
 SD_LOW_MEM_TURBO = "no" # faster at the cost of ~1GB VRAM (only when SD_LOW_MEMORY = "yes")
